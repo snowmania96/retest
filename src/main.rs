@@ -20,7 +20,7 @@ struct StreamCache {
 }
 
 impl StreamCache {
-    fn new(api: Box<dyn Api>) -> Self {
+    fn new(api: Arc<dyn Api>) -> Self {
         let instance = Self {
             results: Arc::new(Mutex::new(HashMap::new())),
         };
@@ -33,27 +33,34 @@ impl StreamCache {
         results.get(key).copied()
     }
 
-    fn update_in_background(&self, api: Box<dyn Api>) {
+    fn update_in_background(&self, api: Arc<dyn Api>) {
         tokio::task::spawn(async move {
             // TODO implement
         });
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::time::Duration;
+    use tokio::sync::Notify;
     use tokio::time;
 
-    use futures::{stream::select, StreamExt};
+    use futures::{future, stream::select, FutureExt, StreamExt};
     use maplit::hashmap;
 
     use super::*;
 
-    struct TestApi {}
+    #[derive(Default)]
+    struct TestApi {
+        signal: Arc<Notify>,
+    }
+
     #[async_trait]
     impl Api for TestApi {
         async fn fetch(&self) -> Result<HashMap<City, Temperature>, String> {
-            time::sleep(Duration::from_millis(10)).await;
+            // fetch is slow an may get delayed until after we receive the first updates
+            self.signal.notified().await;
             Ok(hashmap! {
                 "Berlin".to_string() => 29,
                 "Paris".to_string() => 31,
@@ -64,12 +71,20 @@ mod tests {
                 Ok(("London".to_string(), 27)),
                 Ok(("Paris".to_string(), 32)),
             ];
-            select(futures::stream::iter(results), futures::stream::pending()).boxed()
+            select(
+                futures::stream::iter(results),
+                async {
+                    self.signal.notify_one();
+                    future::pending().await
+                }
+                .into_stream(),
+            )
+            .boxed()
         }
     }
     #[tokio::test]
     async fn works() {
-        let cache = StreamCache::new(Box::new(TestApi {}));
+        let cache = StreamCache::new(Arc::new(TestApi::default()));
 
         // Allow cache to update
         time::sleep(Duration::from_millis(100)).await;
