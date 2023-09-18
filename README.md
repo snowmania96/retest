@@ -10,4 +10,4 @@ Your task is to build a performant and robust cache on top of this API, which al
 
 The goal of the cache is to always return the most recent value the API has delivered.
 
-To check your solution you can run `cargo test`, which runs a simple (non exhaustive test on your implementation). Please try to not use any additional crates as dependencies.
+To check your solution you can run `cargo test`, which runs a simple (non exhaustive) test on your implementation. Please try to not use any additional crates as dependencies.
