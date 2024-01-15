@@ -10,17 +10,17 @@ type City = String;
 type Temperature = u64;
 
 #[async_trait]
-trait Api: Send + Sync {
+pub trait Api: Send + Sync {
     async fn fetch(&self) -> Result<HashMap<City, Temperature>, String>;
     async fn subscribe(&self) -> BoxStream<Result<(City, Temperature), String>>;
 }
 
-struct StreamCache {
+pub struct StreamCache {
     results: Arc<Mutex<HashMap<String, u64>>>,
 }
 
 impl StreamCache {
-    fn new(api: Arc<dyn Api>) -> Self {
+    pub fn new(api: Arc<dyn Api>) -> Self {
         let instance = Self {
             results: Arc::new(Mutex::new(HashMap::new())),
         };
@@ -28,12 +28,12 @@ impl StreamCache {
         instance
     }
 
-    fn get(&self, key: &str) -> Option<u64> {
+    pub fn get(&self, key: &str) -> Option<u64> {
         let results = self.results.lock().expect("poisoned");
         results.get(key).copied()
     }
 
-    fn update_in_background(&self, api: Arc<dyn Api>) {
+    pub fn update_in_background(&self, api: Arc<dyn Api>) {
         tokio::task::spawn(async move {
             // TODO implement
         });
