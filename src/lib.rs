@@ -20,7 +20,7 @@ pub struct StreamCache {
 }
 
 impl StreamCache {
-    pub fn new(api: Arc<dyn Api>) -> Self {
+    pub fn new(api: impl Api) -> Self {
         let instance = Self {
             results: Arc::new(Mutex::new(HashMap::new())),
         };
@@ -33,10 +33,8 @@ impl StreamCache {
         results.get(key).copied()
     }
 
-    pub fn update_in_background(&self, api: Arc<dyn Api>) {
-        tokio::task::spawn(async move {
-            // TODO implement
-        });
+    pub fn update_in_background(&self, api: impl Api) {
+        // TODO: implement
     }
 }
 
@@ -84,7 +82,7 @@ mod tests {
     }
     #[tokio::test]
     async fn works() {
-        let cache = StreamCache::new(Arc::new(TestApi::default()));
+        let cache = StreamCache::new(TestApi::default());
 
         // Allow cache to update
         time::sleep(Duration::from_millis(100)).await;
