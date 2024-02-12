@@ -10,7 +10,7 @@ type City = String;
 type Temperature = u64;
 
 #[async_trait]
-pub trait Api: Send + Sync {
+pub trait Api: Send + Sync + 'static {
     async fn fetch(&self) -> Result<HashMap<City, Temperature>, String>;
     async fn subscribe(&self) -> BoxStream<Result<(City, Temperature), String>>;
 }
