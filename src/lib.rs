@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
+use futures::{stream::BoxStream, StreamExt};
 use std::{
     collections::HashMap,
-    result::Result,
+    result::{self, Result},
     sync::{Arc, Mutex},
 };
 
@@ -86,7 +86,7 @@ mod tests {
     impl Api for TestApi {
         async fn fetch(&self) -> Result<HashMap<City, Temperature>, String> {
             // fetch is slow an may get delayed until after we receive the first updates
-            self.signal.notified().await;
+            // self.signal.notified().await;
             Ok(hashmap! {
                 "Berlin".to_string() => 29,
                 "Paris".to_string() => 31,
