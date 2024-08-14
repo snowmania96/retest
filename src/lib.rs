@@ -35,6 +35,34 @@ impl StreamCache {
 
     pub fn update_in_background(&self, api: impl Api) {
         // TODO: implement
+        let results = Arc::clone(&self.results);
+        tokio::spawn(async move {
+            // let mut fetch_task = tokio::spawn(async move {
+            match api.fetch().await {
+                Ok(data) => {
+                    let mut results = results.lock().expect("poisoned");
+                    *results = data;
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                }
+            }
+            println!("{results:#?}");
+            // });
+
+            let mut stream = api.subscribe().await;
+            while let Some(update) = stream.next().await {
+                match update {
+                    Ok((city, temperature)) => {
+                        let mut results = results.lock().expect("poisoned");
+                        results.insert(city, temperature);
+                    }
+                    Err(e) => {
+                        eprint!("{}", e);
+                    }
+                }
+            }
+        });
     }
 }
 
