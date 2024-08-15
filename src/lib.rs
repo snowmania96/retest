@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{stream::BoxStream, FutureExt, StreamExt};
 use std::{
     collections::HashMap,
     result::{self, Result},
@@ -36,32 +36,46 @@ impl StreamCache {
     pub fn update_in_background(&self, api: impl Api) {
         // TODO: implement
         let results = Arc::clone(&self.results);
-        tokio::spawn(async move {
-            // let mut fetch_task = tokio::spawn(async move {
-            match api.fetch().await {
-                Ok(data) => {
-                    let mut results = results.lock().expect("poisoned");
-                    *results = data;
-                }
-                Err(e) => {
-                    eprintln!("{}", e);
-                }
-            }
-            println!("{results:#?}");
-            // });
 
-            let mut stream = api.subscribe().await;
-            while let Some(update) = stream.next().await {
-                match update {
-                    Ok((city, temperature)) => {
+        tokio::spawn(async move {
+            // First, fetch the initial data
+
+            loop {
+                let mut stream = api.subscribe().await;
+                while let Some(update) = stream.next().await {
+                    match update {
+                        Ok((city, temperature)) => {
+                            let mut results = results.lock().expect("poisoned");
+                            results.insert(city, temperature);
+                        }
+                        Err(e) => {
+                            eprintln!("Error receiving update: {}", e);
+                        }
+                    }
+                }
+                println!("{results:#?}");
+                match api.fetch().await {
+                    Ok(fetched_data) => {
                         let mut results = results.lock().expect("poisoned");
-                        results.insert(city, temperature);
+                        *results = fetched_data;
                     }
                     Err(e) => {
-                        eprint!("{}", e);
+                        eprintln!("Error fetching data: {}", e);
                     }
                 }
             }
+            // // Now handle incremental updates
+            // while let Some(update) = stream.next().await {
+            //     match update {
+            //         Ok((city, temperature)) => {
+            //             let mut results = results.lock().expect("poisoned");
+            //             results.insert(city, temperature);
+            //         }
+            //         Err(e) => {
+            //             eprintln!("{}", e);
+            //         }
+            //     }
+            // }
         });
     }
 }
@@ -86,7 +100,7 @@ mod tests {
     impl Api for TestApi {
         async fn fetch(&self) -> Result<HashMap<City, Temperature>, String> {
             // fetch is slow an may get delayed until after we receive the first updates
-            // self.signal.notified().await;
+            self.signal.notified().await;
             Ok(hashmap! {
                 "Berlin".to_string() => 29,
                 "Paris".to_string() => 31,
@@ -108,6 +122,7 @@ mod tests {
             .boxed()
         }
     }
+
     #[tokio::test]
     async fn works() {
         let cache = StreamCache::new(TestApi::default());
